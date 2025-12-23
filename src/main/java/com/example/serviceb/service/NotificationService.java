@@ -114,12 +114,15 @@ public class NotificationService {
             return "Error: User not found for order";
         }
         
-        // 发送订单通知
+        // 【新增】跨项目调用: 从 service-a 获取订单状态文本描述
+        String statusText = userClient.getOrderStatusText(orderId);
+        
+        // 发送订单通知（使用新的状态文本）
         String message = String.format(
             "Order %s - Amount: $%.2f - Status: %s",
             order.getOrderNumber(),
             order.getTotalAmount(),
-            order.getStatus() == 1 ? "Paid" : "Pending"
+            statusText  // 使用从 service-a 获取的状态文本
         );
         
         return sendEmailNotification(user, message);

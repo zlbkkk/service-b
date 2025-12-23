@@ -70,4 +70,18 @@ public class UserClient {
             return null;
         }
     }
+    
+    /**
+     * 获取订单状态文本描述
+     * 跨项目调用: service-b -> service-a (新增接口)
+     */
+    public String getOrderStatusText(Long orderId) {
+        String url = SERVICE_A_ORDER_URL + "/" + orderId + "/status-text";
+        try {
+            return restTemplate.getForObject(url, String.class);
+        } catch (Exception e) {
+            System.err.println("Failed to get order status text: " + e.getMessage());
+            return "未知状态";
+        }
+    }
 }
