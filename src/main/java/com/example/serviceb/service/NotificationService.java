@@ -6,6 +6,7 @@ import com.example.common.service.UserService;
 import com.example.serviceb.client.UserClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
 
 /**
  * 通知服务 - 使用 common-api 中的 UserDTO 和 UserService
@@ -98,6 +99,7 @@ public class NotificationService {
     /**
      * 发送订单通知（通过订单ID）
      * 跨项目调用: 从 service-a 获取订单和用户信息
+     * 场景5测试：修改现有调用的参数
      */
     public String sendOrderNotification(Long orderId) {
         // 跨项目调用: 从 service-a 获取订单信息
@@ -114,19 +116,68 @@ public class NotificationService {
             return "Error: User not found for order";
         }
         
-        // 【新增】跨项目调用: 从 service-a 获取订单状态文本描述
+        // 场景5测试：新增对 service-a 的调用 - 获取订单详情
+        String orderDetails = userClient.getOrderDetails(orderId, true);
+        
+        // 【修改】跨项目调用: 从 service-a 获取订单状态对象（不再是简单字符串）
         String statusText = userClient.getOrderStatusText(orderId);
         
-        // 发送订单通知（使用新的状态文本）
+        // 场景5测试：使用新增的 DTO 字段
+        String deliveryInfo = order.getDeliveryAddress() != null ? 
+            " - 配送地址: " + order.getDeliveryAddress() : "";
+        
+        // 发送订单通知（使用新的状态文本和字段）
         String message = String.format(
-            "Order %s - Amount: $%.2f - Status: %s",
+            "Order %s - Amount: $%.2f - Discount: $%.2f - Status: %s%s",
             order.getOrderNumber(),
             order.getTotalAmount(),
-            statusText  // 使用从 service-a 获取的状态文本
+            order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO,
+            statusText,
+            deliveryInfo
         );
         
         return sendEmailNotification(user, message);
     }
+    
+    /**
+     * 场景5测试：新增方法 - 发送订单状态变更通知
+     */
+    public String sendOrderStatusChangeNotification(Long orderId, Integer newStatus) {
+        // 跨项目调用: 获取订单信息
+        OrderDTO order = userClient.getOrderById(orderId);
+        if (order == null) {
+            return "Error: Order not found";
+        }
+        
+        // 跨项目调用: 获取用户信息
+        UserDTO user = userClient.getUserById(order.getUserId());
+        if (user == null) {
+            return "Error: User not found";
+        }
+        
+        // 跨项目调用: 获取新状态的文本描述
+        String statusText = userClient.getOrderStatusText(orderId);
+        
+        String message = String.format(
+            "您的订单 %s 状态已更新为: %s",
+            order.getOrderNumber(),
+            statusText
+        );
+        
+        return sendEmailNotification(user, message);
+    }
+    
+    /**
+     * 场景5测试：删除某个跨服务调用 - 移除 sendBulkNotification 方法
+     * （注释掉原有方法，模拟删除）
+     */
+    // public String sendBulkNotification(Long userId, String message) {
+    //     UserDTO user = userClient.getUserById(userId);
+    //     if (user == null) {
+    //         return "Error: User not found";
+    //     }
+    //     return sendEmailNotification(user, message);
+    // }
     
     /**
      * 批量发送通知
