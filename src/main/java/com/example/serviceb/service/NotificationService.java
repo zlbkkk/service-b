@@ -2,21 +2,29 @@ package com.example.serviceb.service;
 
 import com.example.common.dto.UserDTO;
 import com.example.common.dto.OrderDTO;
-import com.example.common.service.UserService;
+import com.example.common.service.OrderService;
 import com.example.serviceb.client.UserClient;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 
 /**
- * 通知服务 - 使用 common-api 中的 UserDTO 和 UserService
- * 并调用 service-a 的用户服务和订单服务
+ * 通知服务 - 使用 Dubbo RPC 调用 service-a 的订单服务
+ * 测试场景：Dubbo RPC 跨服务调用
  */
 @Service
 public class NotificationService {
 
     @Autowired
     private UserClient userClient;
+    
+    /**
+     * 通过 Dubbo RPC 注入 OrderService
+     * 这是跨服务调用的关键：service-b 通过 Dubbo 调用 service-a 的接口
+     */
+    @DubboReference
+    private OrderService orderService;
 
     /**
      * 发送邮件通知
@@ -98,12 +106,15 @@ public class NotificationService {
     
     /**
      * 发送订单通知（通过订单ID）
-     * 跨项目调用: 从 service-a 获取订单和用户信息
-     * 场景5测试：修改现有调用的参数
+     * 【Dubbo RPC 调用测试场景】
+     * 跨项目调用链：
+     * 1. 通过 Dubbo 调用 service-a 的 orderService.getOrderById()
+     * 2. 通过 Dubbo 调用 service-a 的 orderService.getOrderStatusText()
+     * 3. 通过 HTTP 调用 service-a 的 userClient.getUserById()
      */
     public String sendOrderNotification(Long orderId) {
-        // 跨项目调用: 从 service-a 获取订单信息
-        OrderDTO order = userClient.getOrderById(orderId);
+        // 【Dubbo RPC 调用 1】从 service-a 获取订单信息
+        OrderDTO order = orderService.getOrderById(orderId);
         
         if (order == null) {
             return "Error: Order not found";
@@ -116,35 +127,30 @@ public class NotificationService {
             return "Error: User not found for order";
         }
         
-        // 场景5测试：新增对 service-a 的调用 - 获取订单详情
-        String orderDetails = userClient.getOrderDetails(orderId, true);
+        // 【Dubbo RPC 调用 2】从 service-a 获取订单状态文本
+        // 这是我们要测试的关键调用！
+        String statusText = orderService.getOrderStatusText(orderId);
         
-        // 【修改】跨项目调用: 从 service-a 获取订单状态对象（不再是简单字符串）
-        String statusText = userClient.getOrderStatusText(orderId);
-        
-        // 场景5测试：使用新增的 DTO 字段
-        String deliveryInfo = order.getDeliveryAddress() != null ? 
-            " - 配送地址: " + order.getDeliveryAddress() : "";
-        
-        // 发送订单通知（使用新的状态文本和字段）
+        // 发送订单通知
         String message = String.format(
-            "Order %s - Amount: $%.2f - Discount: $%.2f - Status: %s%s",
+            "订单 %s - 金额: ¥%.2f - 状态: %s",
             order.getOrderNumber(),
             order.getTotalAmount(),
-            order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO,
-            statusText,
-            deliveryInfo
+            statusText  // 使用 Dubbo 调用获取的状态文本
         );
         
         return sendEmailNotification(user, message);
     }
     
+    
     /**
-     * 场景5测试：新增方法 - 发送订单状态变更通知
+     * 【新增方法】发送订单状态变更通知
+     * 【Dubbo RPC 调用测试场景】
+     * 这个方法也会调用 orderService.getOrderStatusText()
      */
     public String sendOrderStatusChangeNotification(Long orderId, Integer newStatus) {
-        // 跨项目调用: 获取订单信息
-        OrderDTO order = userClient.getOrderById(orderId);
+        // 【Dubbo RPC 调用 1】获取订单信息
+        OrderDTO order = orderService.getOrderById(orderId);
         if (order == null) {
             return "Error: Order not found";
         }
@@ -155,8 +161,8 @@ public class NotificationService {
             return "Error: User not found";
         }
         
-        // 跨项目调用: 获取新状态的文本描述
-        String statusText = userClient.getOrderStatusText(orderId);
+        // 【Dubbo RPC 调用 2】获取新状态的文本描述
+        String statusText = orderService.getOrderStatusText(orderId);
         
         String message = String.format(
             "您的订单 %s 状态已更新为: %s",
@@ -166,18 +172,6 @@ public class NotificationService {
         
         return sendEmailNotification(user, message);
     }
-    
-    /**
-     * 场景5测试：删除某个跨服务调用 - 移除 sendBulkNotification 方法
-     * （注释掉原有方法，模拟删除）
-     */
-    // public String sendBulkNotification(Long userId, String message) {
-    //     UserDTO user = userClient.getUserById(userId);
-    //     if (user == null) {
-    //         return "Error: User not found";
-    //     }
-    //     return sendEmailNotification(user, message);
-    // }
     
     /**
      * 批量发送通知
