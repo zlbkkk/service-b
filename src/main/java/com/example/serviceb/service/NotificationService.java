@@ -174,6 +174,37 @@ public class NotificationService {
     }
     
     /**
+     * 【新增方法】获取订单详细信息并发送通知
+     * 【完整调用链测试场景】HTTP API → Service → Dubbo RPC
+     * 这个方法会被 Controller 暴露为 HTTP 接口
+     */
+    public String sendOrderDetailsNotification(Long orderId) {
+        // 【Dubbo RPC 调用】获取订单详细信息（包含状态文本）
+        String orderDetails = orderService.getOrderDetails(orderId);
+        
+        if (orderDetails.contains("订单不存在")) {
+            return "Error: Order not found";
+        }
+        
+        // 【Dubbo RPC 调用】获取订单基本信息
+        OrderDTO order = orderService.getOrderById(orderId);
+        
+        // 跨项目调用: 获取用户信息
+        UserDTO user = userClient.getUserById(order.getUserId());
+        if (user == null) {
+            return "Error: User not found";
+        }
+        
+        // 发送包含订单详情的通知
+        String message = String.format(
+            "订单详情通知：\n%s",
+            orderDetails
+        );
+        
+        return sendEmailNotification(user, message);
+    }
+    
+    /**
      * 批量发送通知
      * 跨项目调用: 验证每个用户是否存在
      */
