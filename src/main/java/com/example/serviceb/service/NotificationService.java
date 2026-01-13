@@ -224,4 +224,40 @@ public class NotificationService {
         
         return String.format("Batch notification sent: %d succeeded, %d failed", successCount, failCount);
     }
+    
+    /**
+     * 【新增方法】发送订单摘要通知
+     * 【完整调用链测试】HTTP API → Service → Dubbo RPC
+     * 
+     * 调用链：
+     * 1. HTTP: POST /api/notifications/order-summary?orderId=123
+     * 2. Service: NotificationService.sendOrderSummaryNotification(123L)
+     * 3. Dubbo RPC: OrderService.getOrderSummary(123L) [service-a]
+     * 4. Dubbo RPC: OrderService.getOrderById(123L) [service-a]
+     */
+    public String sendOrderSummaryNotification(Long orderId) {
+        // 【Dubbo RPC 调用】获取订单摘要信息
+        String orderSummary = orderService.getOrderSummary(orderId);
+        
+        if (orderSummary.contains("订单不存在")) {
+            return "Error: Order not found";
+        }
+        
+        // 【Dubbo RPC 调用】获取订单基本信息
+        OrderDTO order = orderService.getOrderById(orderId);
+        
+        // 跨项目调用: 获取用户信息
+        UserDTO user = userClient.getUserById(order.getUserId());
+        if (user == null) {
+            return "Error: User not found";
+        }
+        
+        // 发送包含订单摘要的通知
+        String message = String.format(
+            "订单摘要通知：%s",
+            orderSummary
+        );
+        
+        return sendEmailNotification(user, message);
+    }
 }
