@@ -23,7 +23,7 @@ public class OfTransactionService2 {
     private static final int DEFAULT_PAGE_SIZE = 10;
     
     /** 最大分页大小 */
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 50;
     
     /** 最小交易金额 */
     private static final BigDecimal MIN_AMOUNT = BigDecimal.ZERO;
